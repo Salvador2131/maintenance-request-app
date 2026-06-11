@@ -1,0 +1,53 @@
+import { NextResponse, type NextRequest } from 'next/server'
+import { DEMO_USER_COOKIE, isProtectedPath } from './lib/demo-session'
+
+function isMockMode(request: NextRequest): boolean {
+  return !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+}
+
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+  const demoUserId = request.cookies.get(DEMO_USER_COOKIE)?.value
+  const mockMode = isMockMode(request)
+
+  // En modo mock local no bloqueamos rutas (facilita pantallazos y demo)
+  if (mockMode) {
+    if (pathname === '/login' && demoUserId) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+    return NextResponse.next()
+  }
+
+  if (pathname === '/login' && demoUserId) {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
+  if (isProtectedPath(pathname) && !demoUserId) {
+    const loginUrl = new URL('/login', request.url)
+    loginUrl.searchParams.set('next', pathname)
+    return NextResponse.redirect(loginUrl)
+  }
+
+  return NextResponse.next()
+}
+
+export const config = {
+  matcher: [
+    '/',
+    '/login',
+    '/dashboard',
+    '/dashboard/:path*',
+    '/tareas',
+    '/tareas/:path*',
+    '/calendario',
+    '/calendario/:path*',
+    '/colegios',
+    '/colegios/:path*',
+    '/equipos',
+    '/equipos/:path*',
+    '/reportes',
+    '/reportes/:path*',
+    '/configuracion',
+    '/configuracion/:path*',
+  ],
+}

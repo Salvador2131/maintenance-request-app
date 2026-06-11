@@ -1,0 +1,36 @@
+---
+description: Contexto del proyecto MantenPro — sistema de mantenimiento escolar
+globs:
+alwaysApply: true
+---
+
+# MantenPro
+
+App Next.js 16 (App Router) para gestión de solicitudes de mantenimiento en una red de colegios.
+
+## Stack
+- Next.js 16 + React 19 + TypeScript
+- Tailwind CSS 4 + shadcn/ui (base-nova, @base-ui/react)
+- Zustand (`lib/store.ts`) — estado en memoria, demo
+- Datos mock en `lib/mock-data.ts`
+
+## Roles
+- `contralor` — superadmin, ve todo
+- `director` — crea solicitudes por colegio
+- `tecnico` — ejecuta tareas asignadas
+- `admin_equipo` — gestiona equipos técnicos
+
+## Rutas principales
+- `/login` — selector de rol (demo, sin auth real)
+- `/dashboard`, `/tareas`, `/calendario`, `/colegios`, `/equipos`, `/reportes`, `/configuracion`
+
+## Convenciones
+- UI en español
+- Componentes en `components/`, lógica compartida en `lib/`
+- Preferir extender el store Zustand antes de añadir otro state manager
+- No romper el flujo demo: login por rol → dashboard con permisos por sidebar
+
+## Estado actual
+Backend Supabase en progreso. Datos vía `fetchAppData()` (Supabase o fallback mock).
+Sesión demo con cookie `mantenpro_demo_user_id` + middleware hasta implementar auth real.
+SQL en `supabase/migrations/` y `supabase/seed.sql`.
