@@ -1,8 +1,10 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { mockUsers } from '@/lib/mock-data'
+import { getUsersForLogin } from '@/lib/actions/users'
 import { useAppStore } from '@/lib/store'
+import type { User } from '@/lib/types'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -29,7 +31,7 @@ const roles = [
     textColor: 'text-primary-foreground',
     description: 'Supervisión total del sistema',
     features: ['Vista de todos los colegios', 'Gestión de equipos técnicos', 'Reportes completos', 'Asignación de tareas'],
-    userId: 'user-1',
+    role: 'contralor' as const,
   },
   {
     id: 'director',
@@ -40,7 +42,7 @@ const roles = [
     textColor: 'text-accent-foreground',
     description: 'Gestión de su colegio',
     features: ['Crear solicitudes de mantenimiento', 'Verificar trabajos completados', 'Vista del calendario', 'Seguimiento de tareas'],
-    userId: 'user-2',
+    role: 'director' as const,
   },
   {
     id: 'tecnico',
@@ -51,7 +53,7 @@ const roles = [
     textColor: 'text-foreground',
     description: 'Ejecución de mantenimiento',
     features: ['Ver tareas asignadas', 'Reportar avances', 'Marcar tareas completadas', 'Agregar comentarios'],
-    userId: 'user-5',
+    role: 'tecnico' as const,
   },
   {
     id: 'admin_equipo',
@@ -62,7 +64,7 @@ const roles = [
     textColor: 'text-foreground',
     description: 'Administración de equipos',
     features: ['Gestión de técnicos', 'Reasignación de tareas', 'Estadísticas del equipo', 'Coordinación de trabajos'],
-    userId: 'user-8',
+    role: 'admin_equipo' as const,
   },
 ]
 
@@ -76,15 +78,24 @@ const stats = [
 export default function LoginPage() {
   const router = useRouter()
   const { setCurrentUser } = useAppStore()
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const handleRoleSelect = async (userId: string) => {
-    const user = mockUsers.find((u) => u.id === userId)
+  useEffect(() => {
+    getUsersForLogin().then((result) => {
+      if (result.ok) setUsers(result.data)
+      setLoading(false)
+    })
+  }, [])
+
+  const handleRoleSelect = async (role: User['role']) => {
+    const user = users.find((u) => u.role === role)
     if (!user) return
 
     await fetch('/api/demo-session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify({ userId: user.id }),
     })
 
     setCurrentUser(user)
@@ -149,7 +160,7 @@ export default function LoginPage() {
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {roles.map((role) => {
-            const user = mockUsers.find((u) => u.id === role.userId)
+            const user = users.find((u) => u.role === role.role)
             return (
               <Card
                 key={role.id}
@@ -177,7 +188,8 @@ export default function LoginPage() {
                     ))}
                   </ul>
                   <Button
-                    onClick={() => handleRoleSelect(role.userId)}
+                    onClick={() => handleRoleSelect(role.role)}
+                    disabled={loading || !user}
                     className={`w-full ${role.color} ${role.hoverColor} ${role.textColor}`}
                   >
                     Entrar como {role.label}
@@ -233,7 +245,7 @@ export default function LoginPage() {
       <div className="border-t border-border py-6">
         <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
           <p className="text-xs text-muted-foreground">
-            Demo Mode - Los datos son simulados y no se persisten entre sesiones
+            Modo demo — selecciona un perfil para explorar el sistema con datos de Supabase
           </p>
         </div>
       </div>
