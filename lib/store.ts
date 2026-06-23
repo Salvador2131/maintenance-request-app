@@ -20,6 +20,7 @@ interface AppState {
   // Tasks
   tasks: Task[]
   addTask: (task: Task) => void
+  replaceTask: (task: Task) => void
   updateTask: (taskId: string, updates: Partial<Task>) => void
   updateTaskStatus: (taskId: string, status: TaskStatus, comment?: string) => void
   assignTask: (taskId: string, userId: string, userName: string) => void
@@ -74,6 +75,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   addTask: (task) =>
     set((state) => ({
       tasks: [task, ...state.tasks],
+    })),
+  replaceTask: (task) =>
+    set((state) => ({
+      tasks: state.tasks.map((t) => (t.id === task.id ? task : t)),
     })),
   updateTask: (taskId, updates) =>
     set((state) => ({

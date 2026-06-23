@@ -3,6 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAppStore } from '@/lib/store'
+import {
+  addTaskCommentAction,
+  assignTaskAction,
+  updateTaskStatusAction,
+} from '@/lib/actions/tasks'
+import { isActionFailure } from '@/lib/actions/types'
 import { Task, TaskPriority, TaskStatus, TaskType, TaskComment } from '@/lib/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -75,12 +81,13 @@ interface TaskDetailProps {
 
 export function TaskDetail({ taskId }: TaskDetailProps) {
   const router = useRouter()
-  const { currentUser, tasks, users, updateTaskStatus, assignTask, addTaskComment, addNotification } = useAppStore()
+  const { currentUser, tasks, users, dataSource, replaceTask, updateTaskStatus, assignTask, addTaskComment, addNotification } = useAppStore()
   const [comment, setComment] = useState('')
   const [rejectReason, setRejectReason] = useState('')
   const [selectedTechnician, setSelectedTechnician] = useState('')
   const [showAssignDialog, setShowAssignDialog] = useState(false)
   const [showRejectDialog, setShowRejectDialog] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
 
   const task = tasks.find((t) => t.id === taskId)
 
@@ -101,14 +108,36 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
   const canChangeStatus = task.assignedTo === currentUser?.id || currentUser?.role === 'contralor'
   const canVerify = currentUser?.role === 'director' && task.schoolId === currentUser.schoolId
 
-  const handleAddComment = () => {
-    if (!comment.trim()) return
+  const handleAddComment = async () => {
+    if (!comment.trim() || !currentUser) return
+
+    if (dataSource === 'supabase') {
+      setIsSaving(true)
+      const result = await addTaskCommentAction({
+        taskId: task.id,
+        userId: currentUser.id,
+        userName: currentUser.name,
+        content: comment.trim(),
+      })
+      setIsSaving(false)
+
+      if (isActionFailure(result)) {
+        toast.error(result.error)
+        return
+      }
+
+      addTaskComment(task.id, result.data)
+      setComment('')
+      toast.success('Comentario agregado')
+      router.refresh()
+      return
+    }
 
     const newComment: TaskComment = {
       id: `comment-${Date.now()}`,
       taskId: task.id,
-      userId: currentUser?.id || '',
-      userName: currentUser?.name || '',
+      userId: currentUser.id,
+      userName: currentUser.name,
       content: comment,
       createdAt: new Date(),
     }
@@ -118,11 +147,34 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     toast.success('Comentario agregado')
   }
 
-  const handleAssign = () => {
+  const handleAssign = async () => {
     if (!selectedTechnician) return
 
     const tech = users.find((u) => u.id === selectedTechnician)
     if (!tech) return
+
+    if (dataSource === 'supabase') {
+      setIsSaving(true)
+      const result = await assignTaskAction({
+        taskId: task.id,
+        technicianId: tech.id,
+        technicianName: tech.name,
+        taskTitle: task.title,
+        schoolName: task.schoolName,
+      })
+      setIsSaving(false)
+
+      if (isActionFailure(result)) {
+        toast.error(result.error)
+        return
+      }
+
+      replaceTask(result.data)
+      setShowAssignDialog(false)
+      toast.success(`Tarea asignada a ${tech.name}`)
+      router.refresh()
+      return
+    }
 
     assignTask(task.id, tech.id, tech.name)
 
@@ -141,15 +193,54 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     toast.success(`Tarea asignada a ${tech.name}`)
   }
 
-  const handleStartTask = () => {
+  const handleStartTask = async () => {
+    if (dataSource === 'supabase') {
+      setIsSaving(true)
+      const result = await updateTaskStatusAction({
+        taskId: task.id,
+        status: 'en_progreso',
+      })
+      setIsSaving(false)
+
+      if (isActionFailure(result)) {
+        toast.error(result.error)
+        return
+      }
+
+      replaceTask(result.data)
+      toast.success('Tarea iniciada')
+      router.refresh()
+      return
+    }
+
     updateTaskStatus(task.id, 'en_progreso')
     toast.success('Tarea iniciada')
   }
 
-  const handleCompleteTask = () => {
+  const handleCompleteTask = async () => {
+    if (dataSource === 'supabase') {
+      setIsSaving(true)
+      const result = await updateTaskStatusAction({
+        taskId: task.id,
+        status: 'completada',
+        taskTitle: task.title,
+        schoolId: task.schoolId,
+      })
+      setIsSaving(false)
+
+      if (isActionFailure(result)) {
+        toast.error(result.error)
+        return
+      }
+
+      replaceTask(result.data)
+      toast.success('Tarea marcada como completada')
+      router.refresh()
+      return
+    }
+
     updateTaskStatus(task.id, 'completada')
 
-    // Notify director
     const school = task.schoolId
     const director = users.find((u) => u.role === 'director' && u.schoolId === school)
     if (director) {
@@ -168,7 +259,28 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     toast.success('Tarea marcada como completada')
   }
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
+    if (dataSource === 'supabase') {
+      setIsSaving(true)
+      const result = await updateTaskStatusAction({
+        taskId: task.id,
+        status: 'verificada',
+        taskTitle: task.title,
+        assignedToId: task.assignedTo,
+      })
+      setIsSaving(false)
+
+      if (isActionFailure(result)) {
+        toast.error(result.error)
+        return
+      }
+
+      replaceTask(result.data)
+      toast.success('Tarea verificada y aprobada')
+      router.refresh()
+      return
+    }
+
     updateTaskStatus(task.id, 'verificada')
 
     addNotification({
@@ -185,9 +297,32 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     toast.success('Tarea verificada y aprobada')
   }
 
-  const handleReject = () => {
+  const handleReject = async () => {
     if (!rejectReason.trim()) {
       toast.error('Por favor ingresa un motivo de rechazo')
+      return
+    }
+
+    if (dataSource === 'supabase') {
+      setIsSaving(true)
+      const result = await updateTaskStatusAction({
+        taskId: task.id,
+        status: 'rechazada',
+        rejectionReason: rejectReason,
+        taskTitle: task.title,
+        assignedToId: task.assignedTo,
+      })
+      setIsSaving(false)
+
+      if (isActionFailure(result)) {
+        toast.error(result.error)
+        return
+      }
+
+      replaceTask(result.data)
+      setShowRejectDialog(false)
+      toast.error('Tarea rechazada')
+      router.refresh()
       return
     }
 
@@ -304,7 +439,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                   onChange={(e) => setComment(e.target.value)}
                   rows={3}
                 />
-                <Button onClick={handleAddComment} disabled={!comment.trim()} className="w-full sm:w-auto">
+                <Button onClick={handleAddComment} disabled={!comment.trim() || isSaving} className="w-full sm:w-auto">
                   Agregar Comentario
                 </Button>
               </div>
@@ -416,7 +551,9 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                       <Button variant="outline" onClick={() => setShowAssignDialog(false)}>
                         Cancelar
                       </Button>
-                      <Button onClick={handleAssign}>Asignar</Button>
+                      <Button onClick={handleAssign} disabled={isSaving || !selectedTechnician}>
+                        {isSaving ? 'Asignando...' : 'Asignar'}
+                      </Button>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>

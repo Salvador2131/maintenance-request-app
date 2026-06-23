@@ -1,7 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAppStore } from '@/lib/store'
+import {
+  defaultNotificationPreferences,
+  loadNotificationPreferences,
+  saveNotificationPreferences,
+  type NotificationPreferences,
+} from '@/lib/preferences'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,16 +19,22 @@ import { Bell, Mail, User, Shield, Palette } from 'lucide-react'
 
 export default function ConfiguracionPage() {
   const { currentUser } = useAppStore()
-  const [notifications, setNotifications] = useState({
-    email: true,
-    push: true,
-    taskCreated: true,
-    taskAssigned: true,
-    taskCompleted: true,
-    taskVerified: true,
-  })
+  const [notifications, setNotifications] = useState<NotificationPreferences>(
+    defaultNotificationPreferences
+  )
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      setNotifications(loadNotificationPreferences(currentUser.id))
+    }
+  }, [currentUser?.id])
 
   const handleSave = () => {
+    if (!currentUser?.id) {
+      toast.error('No hay usuario activo')
+      return
+    }
+    saveNotificationPreferences(currentUser.id, notifications)
     toast.success('Configuración guardada exitosamente')
   }
 

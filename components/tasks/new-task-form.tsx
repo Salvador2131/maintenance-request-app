@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAppStore } from '@/lib/store'
+import { createTask } from '@/lib/actions/tasks'
+import { isActionFailure } from '@/lib/actions/types'
 import { TaskType, TaskPriority, Task } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -37,7 +39,7 @@ const priorityLabels: Record<TaskPriority, string> = {
 
 export function NewTaskForm() {
   const router = useRouter()
-  const { currentUser, schools, addTask, addNotification } = useAppStore()
+  const { currentUser, schools, addTask, addNotification, dataSource } = useAppStore()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [formData, setFormData] = useState({
@@ -60,6 +62,32 @@ export function NewTaskForm() {
     }
 
     const school = schools.find((s) => s.id === formData.schoolId)
+
+    if (dataSource === 'supabase' && currentUser) {
+      const result = await createTask({
+        title: formData.title,
+        description: formData.description,
+        type: formData.type as TaskType,
+        priority: formData.priority as TaskPriority,
+        schoolId: formData.schoolId,
+        location: formData.location,
+        createdBy: currentUser.id,
+        createdByName: currentUser.name,
+      })
+
+      if (isActionFailure(result)) {
+        toast.error(result.error)
+        setIsSubmitting(false)
+        return
+      }
+
+      addTask(result.data)
+      toast.success('Tarea creada exitosamente')
+      router.refresh()
+      router.push('/tareas')
+      setIsSubmitting(false)
+      return
+    }
 
     const newTask: Task = {
       id: `task-${Date.now()}`,

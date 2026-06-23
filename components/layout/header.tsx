@@ -1,6 +1,7 @@
 'use client'
 
 import { useAppStore } from '@/lib/store'
+import { markNotificationAsRead } from '@/lib/actions/notifications'
 import { UserAvatar } from '@/components/user-avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -24,7 +25,7 @@ const roleLabels: Record<string, string> = {
 
 export function Header() {
   const router = useRouter()
-  const { currentUser, notifications, setSidebarOpen, sidebarOpen } = useAppStore()
+  const { currentUser, notifications, dataSource, markNotificationAsRead: markReadInStore, setSidebarOpen, sidebarOpen } = useAppStore()
   const [isDark, setIsDark] = useState(false)
 
   useEffect(() => {
@@ -40,6 +41,23 @@ export function Header() {
   const handleLogout = async () => {
     await fetch('/api/demo-session', { method: 'DELETE' })
     router.push('/login')
+  }
+
+  const handleNotificationClick = async (notifId: string, taskId?: string) => {
+    const notif = notifications.find((n) => n.id === notifId)
+    if (!notif || notif.read) {
+      if (taskId) router.push(`/tareas/${taskId}`)
+      return
+    }
+
+    if (dataSource === 'supabase') {
+      const result = await markNotificationAsRead(notifId)
+      if (result.ok) markReadInStore(notifId)
+    } else {
+      markReadInStore(notifId)
+    }
+
+    if (taskId) router.push(`/tareas/${taskId}`)
   }
 
   const unreadCount = notifications.filter((n) => !n.read && n.userId === currentUser?.id).length
@@ -85,7 +103,11 @@ export function Header() {
               .filter((n) => n.userId === currentUser?.id)
               .slice(0, 5)
               .map((notif) => (
-                <DropdownMenuItem key={notif.id} className="flex flex-col items-start gap-1 py-3">
+                <DropdownMenuItem
+                  key={notif.id}
+                  className="flex flex-col items-start gap-1 py-3 cursor-pointer"
+                  onClick={() => handleNotificationClick(notif.id, notif.taskId)}
+                >
                   <span className={`text-sm font-medium ${notif.read ? 'text-muted-foreground' : 'text-foreground'}`}>
                     {notif.title}
                   </span>

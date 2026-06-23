@@ -1,8 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { DEMO_USER_COOKIE, isProtectedPath } from './lib/demo-session'
+import { isSupabaseConfigured } from './lib/env'
 
-function isMockMode(request: NextRequest): boolean {
-  return !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+function isMockMode(_request: NextRequest): boolean {
+  return !isSupabaseConfigured()
 }
 
 export function middleware(request: NextRequest) {
